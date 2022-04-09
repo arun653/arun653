@@ -1,0 +1,28 @@
+
+server:
+  port: 8082
+  servlet:
+    context-path: /
+
+spring:
+  main:
+    banner-mode: "off"
+  datasource:
+    url: jdbc:h2:mem:mydb
+    username: sa
+    password: password
+    driverClassName: org.h2.Driver
+  jpa:
+    spring.jpa.database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+
+logging:
+  level:
+    org:
+      springframework: INFO
+
+third:
+  party:
+    base:
+      url: http://localhost:9092
