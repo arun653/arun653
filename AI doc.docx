@@ -1,0 +1,496 @@
+
+
+
+ARCHGUARD AI
+Intelligent Architecture Conformance Platform
+
+
+
+Product Requirements Document
+Version 1.0  |  May 2026
+Classification: Internal  |  Status: Draft
+
+
+Powered by VS Code  •  GitHub Copilot  •  Claude AI  •  Neo4j
+
+1. Executive Summary
+
+
+Modern software modernization programs — particularly migration from monolithic systems to distributed or microservices-based architectures — suffer a persistent and costly problem: the gap between what architects design and what developers actually build. This gap, known as Architecture Drift, grows silently across sprints, becomes expensive to reverse, and frequently results in technical debt that undermines the entire modernization effort.
+
+ArchGuard AI is an intelligent, VS Code-native architecture conformance platform that eliminates this gap. It combines static code analysis, framework knowledge graph technology, and AI-powered reasoning to continuously validate developer implementations against architect-defined High-Level Designs (HLD) and Low-Level Designs (LLD) — surfacing deviations, coding standard violations, and design pattern mismatches in real time, directly inside the developer's IDE.
+
+ArchGuard AI does not require the application to be running. It operates entirely on source code and bytecode, making it lightweight, fast, and safe to use at any stage of development.
+
+2. Problem Statement
+
+
+2.1 The Architecture Drift Problem
+In enterprise modernization programs, architects invest significant effort producing HLD and LLD documents that define component boundaries, service interactions, design patterns, layering rules, and framework usage conventions. These documents serve as the authoritative blueprint for development teams.
+
+However, once development begins, these blueprints are rarely enforced systematically. The following chain of failures is typical:
+Architects produce HLD/LLD documents in Word, Confluence, or diagram tools
+Developers interpret these documents subjectively
+No automated mechanism validates implementation against design intent
+Deviations accumulate silently across sprints
+Drift is discovered late — during architecture reviews or production incidents
+Remediation at that stage is expensive and disruptive
+
+2.2 Specific Pain Points
+Pain Point
+Impact
+Current State
+Architecture Drift
+High rework cost, technical debt accumulation
+Manual review only
+Coding Standard Violations
+Inconsistent codebase, maintainability issues
+Partial — linters only
+Design Pattern Misuse
+Fragile code, anti-patterns embedded
+No automated detection
+Framework Misuse
+Runtime bugs, performance issues
+No automated detection
+Late Detection
+Cost of fix multiplies 10x after sprint
+End-of-sprint reviews
+Knowledge Silos
+Framework rules live only in senior devs' heads
+Wiki docs, informal
+
+
+3. Solution Overview
+
+
+3.1 Product Name & Identity
+Attribute
+Value
+Product Name
+ArchGuard AI
+Tagline
+Your Architecture, Always Honest
+Platform
+Visual Studio Code (VS Code)
+Primary Interface
+Copilot Agent Mode + Custom VS Code Extension
+AI Engine
+GitHub Copilot + Claude API (Anthropic)
+Graph Engine
+Neo4j (local instance)
+Code Analysis
+JavaParser + jQAssistant + ArchUnit + Checkstyle + PMD
+Target Users
+Java Developers, Software Architects, Tech Leads
+Target Domain
+Java Application Modernization Programs
+
+
+3.2 Core Concept
+ArchGuard AI operates on three foundational pillars:
+
+Architect Intent Ingestion — Parse HLD/LLD documents (PlantUML, Mermaid, draw.io, YAML rule files) into a structured intent graph stored in Neo4j.
+Code Reality Extraction — Statically analyse Java source and bytecode to build a code graph representing actual implementation structure, dependencies, layers, and patterns.
+AI-Powered Conformance Engine — Compare intent graph against code graph using graph diffing algorithms and Claude API reasoning to produce actionable deviation reports.
+
+4. Capabilities
+
+
+4.1 Architecture Conformance Validation
+Validates developer code against architect-defined HLD and LLD documents across multiple dimensions:
+Component boundary validation — detects services or modules accessing components outside their defined scope
+Layer violation detection — flags controllers directly accessing repositories, bypassing service layers
+Module dependency rule enforcement — validates that dependency directions match the architect's intended dependency graph
+Microservice boundary detection — identifies logic that should be in a separate service per the HLD
+Missing component detection — reports when an LLD-defined component (e.g., cache layer, API gateway adapter) is absent from the codebase
+
+4.2 Coding Standard Enforcement
+Enforces organisation-defined and framework-recommended coding standards statically across the entire Java codebase:
+Naming conventions — classes, methods, constants, packages per defined standards
+Class and method size limits — cyclomatic complexity thresholds
+Exception handling standards — no swallowed exceptions, proper exception hierarchies
+Annotation correctness — proper use of Spring, JPA, and other framework annotations
+Injection style enforcement — constructor injection over field injection
+DTO/Entity separation — entities must not be exposed at API boundaries
+Custom rule support — organisation-specific standards defined in YAML rule files
+
+4.3 Design Pattern Detection and Validation
+Detects the presence, absence, and correctness of design patterns as specified in the LLD:
+Structural pattern detection — Singleton, Factory, Builder, Proxy, Decorator, Facade, Adapter
+Behavioural pattern detection — Strategy, Observer, Template Method, Chain of Responsibility, Command
+Spring-native pattern validation — Repository pattern, Service layer, Event-driven patterns, CQRS
+Pattern correctness reasoning — not just structural presence but semantic correctness via Claude API
+Anti-pattern detection — God classes, anemic domain models, circular dependencies, direct instantiation in services
+
+4.4 Framework Knowledge Base (Self-Learning)
+A unique capability that sets ArchGuard AI apart from all existing tools: the ability to autonomously learn framework rules from bytecode and source JARs:
+Framework ingestion pipeline — point ArchGuard AI at any framework JAR and it builds a knowledge graph of that framework's conventions, rules, and usage patterns
+Multi-framework support — Spring Boot, Hibernate/JPA, Quarkus, Micronaut, Kafka, gRPC, and any Java framework
+Requirement-to-pattern mapping — the knowledge base understands that 'need pagination' means Pageable + Page<T>, that 'need caching' means @Cacheable + CacheManager configuration
+Version-aware — re-ingest a new framework version JAR to automatically update the knowledge base
+Anti-pattern library — learns known misuse patterns from Javadoc warnings and deprecated API annotations
+
+4.5 VS Code Native Experience
+All capabilities are delivered natively within VS Code without requiring any external tools or browser access:
+Copilot Chat integration (Agent Mode) — natural language queries against the architecture knowledge base
+Custom VS Code panel — visual architecture diagrams rendered as C4 and PlantUML inside the IDE
+Problems panel integration — deviations surface as warnings and errors in the standard VS Code Problems view
+Jump-to-code navigation — click any deviation in the report to navigate directly to the offending line
+On-save analysis — optional lightweight check on file save for immediate feedback
+Command palette commands — run full analysis, ingest framework, load LLD from command palette
+
+4.6 Deviation Reporting
+Produces structured, actionable deviation reports inside VS Code:
+Severity classification — Critical, Major, Minor, Advisory
+Deviation categories — Architecture, Coding Standard, Design Pattern, Framework Misuse
+Plain English explanation — Claude API generates human-readable explanations of each deviation
+Fix suggestions — AI-generated suggested corrections for each deviation
+Trend tracking — compares current analysis with previous run to show new deviations introduced
+Export support — generate reports as HTML or Markdown for sharing with architects
+
+5. Functional Requirements
+
+
+5.1 Architect Input Module
+ID
+Requirement
+Priority
+FR-01
+System shall parse PlantUML diagrams (.puml) as LLD/HLD input
+Must Have
+FR-02
+System shall parse Mermaid diagram files (.mmd) as LLD/HLD input
+Must Have
+FR-03
+System shall parse draw.io XML exports as LLD/HLD input
+Must Have
+FR-04
+System shall accept YAML-based architecture rule files as primary rule definition format
+Must Have
+FR-05
+System shall extract component names, relationships, and layer definitions from input diagrams
+Must Have
+FR-06
+System shall use Claude API to extract structured intent from narrative LLD text documents
+Should Have
+FR-07
+System shall store parsed architect intent in Neo4j as a queryable intent graph
+Must Have
+FR-08
+System shall support versioning of architect intent (track LLD changes over time)
+Nice to Have
+
+
+5.2 Code Analysis Module
+ID
+Requirement
+Priority
+FR-09
+System shall perform static analysis of Java source files (.java) without executing the application
+Must Have
+FR-10
+System shall parse Java bytecode (.class files) using jQAssistant or ASM
+Must Have
+FR-11
+System shall extract class hierarchy, interfaces, annotations, and method signatures
+Must Have
+FR-12
+System shall build a dependency graph of all class and package relationships
+Must Have
+FR-13
+System shall detect architectural layer membership for each class
+Must Have
+FR-14
+System shall identify design pattern structures using AST pattern matching
+Must Have
+FR-15
+System shall store the code graph in Neo4j alongside the intent graph
+Must Have
+FR-16
+System shall support incremental analysis — re-scan only changed files
+Should Have
+
+
+5.3 Framework Knowledge Base Module
+ID
+Requirement
+Priority
+FR-17
+System shall ingest framework JARs and extract annotation definitions, interface contracts, and class hierarchies
+Must Have
+FR-18
+System shall ingest framework source JARs to extract intent and usage documentation
+Must Have
+FR-19
+System shall use Claude API to generate structured usage rules from extracted framework data
+Must Have
+FR-20
+System shall store framework knowledge as a queryable graph in Neo4j
+Must Have
+FR-21
+System shall support ingestion of multiple frameworks for projects with mixed dependencies
+Must Have
+FR-22
+System shall support framework version updates by re-ingesting new JAR versions
+Should Have
+FR-23
+System shall map requirement types (e.g., 'pagination', 'caching', 'async') to expected implementation patterns per framework
+Must Have
+
+
+5.4 Conformance Engine
+ID
+Requirement
+Priority
+FR-24
+System shall perform graph diff between intent graph and code graph to identify structural deviations
+Must Have
+FR-25
+System shall validate layer compliance — no cross-layer violations against defined rules
+Must Have
+FR-26
+System shall validate module boundary compliance against HLD component definitions
+Must Have
+FR-27
+System shall validate design pattern presence and structural correctness against LLD specifications
+Must Have
+FR-28
+System shall use Claude API to validate semantic pattern correctness beyond structural matching
+Must Have
+FR-29
+System shall validate framework usage against the framework knowledge base
+Must Have
+FR-30
+System shall classify each deviation by severity: Critical, Major, Minor, Advisory
+Must Have
+FR-31
+System shall generate plain-English explanation for each deviation using Claude API
+Must Have
+FR-32
+System shall generate fix suggestions for each deviation using Claude API
+Should Have
+
+
+6. VS Code Integration Requirements
+
+
+6.1 MCP Server
+System shall expose a local MCP (Model Context Protocol) server consumable by Copilot Agent Mode
+MCP server shall expose tools: scan_project, ingest_framework, load_lld, run_conformance_check, get_deviation_report, explain_deviation, suggest_fix
+MCP server shall be startable from VS Code command palette or automatically on workspace open
+MCP server shall run as a local Node.js or Python process with no external network dependencies except Claude API
+
+6.2 VS Code Extension
+Extension shall provide a dedicated ArchGuard AI sidebar panel with architecture diagram viewer
+Extension shall render C4 and PlantUML diagrams inside VS Code without external browser
+Extension shall integrate with VS Code Problems panel to surface deviations as diagnostics
+Extension shall support click-to-navigate from deviation to offending source line
+Extension shall provide command palette entries for all major operations
+Extension shall support on-save lightweight analysis with configurable scope
+
+6.3 Copilot Agent Mode Integration
+All analysis capabilities shall be accessible via natural language through Copilot Chat in Agent Mode
+Agent Mode shall support queries such as: 'Has the payment module deviated from the LLD?', 'Show me all layer violations', 'What design patterns are incorrectly implemented?'
+Agent Mode shall be able to explain any deviation in context of the specific code file open in the editor
+Agent Mode shall suggest code fixes inline using VS Code editor integration
+
+7. Non-Functional Requirements
+
+
+Category
+Requirement
+Performance
+Full project scan of up to 500 Java classes shall complete within 3 minutes
+Performance
+Incremental scan (changed files only) shall complete within 30 seconds
+Performance
+Framework ingestion for a 50MB JAR shall complete within 10 minutes (one-time setup)
+Availability
+All analysis runs offline — no internet required except for Claude API calls
+Security
+No source code is ever transmitted to external services except Claude API (controlled by user)
+Security
+Claude API key stored in VS Code secrets store, never in workspace files
+Portability
+Solution shall run on Windows, macOS, and Linux
+Usability
+Developer shall be able to run first analysis within 15 minutes of installation
+Usability
+All deviation reports shall be readable by developers without architect intervention
+Maintainability
+Framework knowledge base updates shall require only re-ingestion of new JAR — no code changes
+Scalability
+Neo4j graph shall support projects with up to 10,000 classes
+
+
+8. Technology Stack
+
+
+Component
+Technology
+Purpose
+VS Code Extension
+TypeScript
+IDE integration, panels, diagnostics, commands
+MCP Server
+Node.js / Python
+Bridge between Copilot Agent Mode and analysis engine
+Code Parser
+JavaParser (Java)
+AST-level source code analysis
+Bytecode Analyser
+jQAssistant + ASM
+Bytecode scanning, dependency graph extraction
+Architecture Rules
+ArchUnit
+Layer and dependency rule enforcement
+Coding Standards
+Checkstyle + PMD
+Naming, structure, complexity checks
+Graph Database
+Neo4j (local)
+Intent graph, code graph, framework knowledge base
+AI Reasoning
+Claude API (Anthropic)
+Pattern correctness, deviation explanation, fix suggestions
+Diagram Rendering
+PlantUML Extension
+Architecture diagram visualisation in VS Code
+LLD Input Formats
+PlantUML / Mermaid / draw.io / YAML
+Architect intent ingestion
+Build Integration
+Maven / Gradle CLI
+Trigger analysis via project build system
+
+
+9. Phased Delivery Roadmap
+
+
+Phase 1 — Foundation (Weeks 1–4)
+MCP server scaffold with basic tool definitions
+JavaParser integration — scan project, extract class graph
+Neo4j local setup and graph schema definition
+VS Code extension skeleton with command palette
+Basic layer violation detection using ArchUnit
+
+Phase 2 — Architect Intent Ingestion (Weeks 5–8)
+PlantUML parser — extract components, relationships, layers
+Mermaid parser — same extraction
+YAML architecture rule file parser and validator
+Intent graph storage in Neo4j
+First deviation report: HLD component boundary violations
+
+Phase 3 — Framework Knowledge Base (Weeks 9–13)
+Framework JAR ingestion pipeline (bytecode + source JAR)
+Claude API integration for framework rule extraction
+Framework knowledge graph schema and storage
+Requirement-to-pattern mapping engine
+Multi-framework support (Spring Boot, Hibernate, Kafka)
+
+Phase 4 — Design Pattern & Coding Standards (Weeks 14–17)
+Design pattern structural detection via JavaParser AST
+Claude API integration for pattern semantic correctness
+Checkstyle + PMD integration for coding standards
+Custom YAML coding standard rule support
+Anti-pattern detection library
+
+Phase 5 — VS Code Experience (Weeks 18–22)
+Full VS Code extension with architecture diagram panel
+Problems panel integration with click-to-navigate
+Copilot Agent Mode natural language query support
+On-save analysis with configurable scope
+HTML/Markdown deviation report export
+
+10. Value Proposition
+
+
+10.1 Problems Solved
+Problem
+How ArchGuard AI Solves It
+Architecture drift goes undetected until late
+Continuous, automated conformance checking on every analysis run
+Manual architecture reviews are expensive and infrequent
+Developer self-service — run analysis anytime in under 3 minutes
+Framework rules live only in senior developers' heads
+Autonomous framework knowledge base built directly from JAR files
+Coding standards rely on manual code review
+Automated enforcement of all naming, structure, and complexity rules
+Design pattern misuse is hard to detect
+Static detection + AI semantic validation of pattern correctness
+Architects and developers speak different languages
+Claude API translates graph deviations into plain English with fix suggestions
+New team members don't know the rules
+Knowledge base externalises all rules — accessible to everyone
+Different frameworks have different conventions
+Self-learning ingestion pipeline works on any Java framework JAR
+
+
+10.2 Business Value
+Reduce architecture rework cost — catch deviations in minutes, not months
+Accelerate developer onboarding — rules are automated, not tribal knowledge
+Increase architect confidence — real-time visibility into implementation fidelity
+Protect modernisation investment — ensure the target architecture is actually being built
+Reduce technical debt accumulation — prevent anti-patterns before they are committed
+Enable framework-agnostic governance — works on any Java stack without manual rule writing
+
+10.3 What Makes ArchGuard AI Different
+Capability
+Existing Tools
+ArchGuard AI
+Architecture conformance
+Manual review / Lattix (commercial)
+Automated, AI-powered, VS Code native
+Framework rule learning
+Manual rule configuration
+Autonomous ingestion from JAR files
+Design pattern validation
+Structural only
+Structural + AI semantic correctness
+Developer experience
+Separate tools, CLI, reports
+Unified inside VS Code + Copilot Chat
+LLD comparison
+Not available in any tool
+Core capability
+Natural language queries
+Not available
+Full Copilot Agent Mode integration
+Fix suggestions
+Not available
+AI-generated per deviation
+
+
+11. Constraints & Assumptions
+
+
+11.1 Constraints
+Target language is Java only in Version 1.0
+Requires local Neo4j installation (Community Edition — free)
+Claude API requires internet connectivity and a valid Anthropic API key
+Framework knowledge base accuracy depends on availability of source JARs alongside binary JARs
+Narrative LLD text extraction (Word/PDF) accuracy is approximately 75–80% — PlantUML/YAML inputs are strongly preferred
+
+11.2 Assumptions
+Architects will adopt PlantUML or YAML rule files as the standard HLD/LLD input format
+Developers have VS Code with GitHub Copilot (paid plan) installed
+Projects use Maven or Gradle as build systems
+Neo4j Desktop (free) is installable on developer machines
+Teams have access to Anthropic API keys for Claude integration
+
+12. Glossary
+
+
+Term
+Definition
+Architecture Drift
+The progressive divergence between the intended architecture (HLD/LLD) and the actual implemented code
+HLD
+High-Level Design — architect document defining system components, boundaries, and interactions at a macro level
+LLD
+Low-Level Design — architect document defining detailed implementation specifications, patterns, and framework usage
+MCP
+Model Context Protocol — Anthropic's open standard for connecting AI models to external tools and data sources
+Intent Graph
+A Neo4j graph representation of the architect's design intent, extracted from HLD/LLD documents
+Code Gr
