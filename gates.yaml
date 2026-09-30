@@ -1,0 +1,168 @@
+# gates.yaml: precise, machine-readable quality gate definitions
+# Governed by CONSTITUTION.md §7. A gate is defined by: command, inputs,
+# pass rule, failure output, and the task that introduces it.
+# Rule: a gate that is defined here but not yet implemented FAILS (exit 2),
+# it does not silently pass. Exception: gates with `introduced_in` later than
+# the current task in docs/PROGRESS.md report SKIPPED, not PASSED.
+
+version: 0.1.0
+
+exit_codes:
+  0: passed
+  1: failed          # a rule was violated
+  2: not_implemented # defined but no implementation; counts as failure
+  3: skipped         # not yet due per introduced_in; never counts as pass in CI summary
+
+report:
+  format: json
+  path: out/gates/<gate-id>.json
+  fields: [gate, status, started_at, duration_ms, findings, counts]
+  finding_fields: [severity, element_id, file, line, rule, message]
+
+gates:
+
+  - id: G1-schemas
+    make: validate-schemas
+    introduced_in: T03
+    purpose: Every spec file is structurally valid.
+    inputs: ["specs/**/*.yaml", "core/specs/*.schema.json"]
+    command: "framework validate schemas --schema-dir core/specs --specs specs"
+    pass_when:
+      - every spec validates against the schema for its declared `kind` and `schema_version`
+      - unknown top-level fields count as errors (additionalProperties: false)
+      - extension overlays are additive only
+    fail_when:
+      - any schema error (severity=error)
+      - spec has no `kind` or `schema_version`
+    tolerance: 0 errors
+    negative_tests: core/specs/tests/invalid/   # each file must be rejected with its expected rule id
+
+  - id: G2-links
+    make: validate-links
+    introduced_in: T04
+    purpose: The trace graph is complete and consistent.
+    inputs: ["specs/**/*.yaml", "trace/id-registry.yaml"]
+    command: "framework validate links --specs specs --registry trace/id-registry.yaml"
+    pass_when:
+      - all IDs unique across all levels
+      - every `parent` resolves to an existing element of the allowed parent kind
+        (CLS->CMP, CMP->CTR, CTR->SYS, ACT/EXT->SYS)
+      - every `realizes` resolves to an element exactly one level up
+      - every element has a non-null `source`, except SYS/ACT/EXT and elements with origin=manual
+      - every ID in specs exists in the registry, and no registry ID was removed or remapped
+      - no orphans: every non-root element is reachable from a SYS root
+    fail_when:
+      - any of the above violated
+    tolerance: 0 errors
+    negative_tests: trace/tests/invalid/
+
+  - id: G3-compile
+    make: compile-generated
+    introduced_in: T14
+    purpose: Generated Java skeletons compile.
+    inputs: ["out/generated/**"]
+    command: "mvn -q -f out/generated/pom.xml -DskipTests compile"   # or gradle equivalent from profile
+    pass_when:
+      - build exits 0 with JDK from java-profile config (default 21)
+      - zero compiler errors
+      - warnings allowed, but count is recorded and must not exceed baseline in evals/baselines/compile-warnings.json
+    fail_when:
+      - non-zero exit, or warnings exceed baseline
+    tolerance: 0 errors
+
+  - id: G4-boundaries
+    make: test-boundaries
+    introduced_in: T08
+    purpose: Code respects component boundaries declared in the C3 spec.
+    inputs: ["specs/c3/**", "out/generated/**", "out/archunit/**"]
+    command: "mvn -q -f out/archunit/pom.xml test"
+    pass_when:
+      - ArchUnit tests are generated from C3 `allowed_dependencies`, not hand-written
+      - every declared component has at least one generated rule
+      - all generated rules pass
+      - test count == number of rules in the C3 spec (no silently dropped rules)
+    fail_when:
+      - any ArchUnit failure, or generated rule count mismatch
+    tolerance: 0 failures
+
+  - id: G5-golden
+    make: test-golden
+    introduced_in: T06
+    purpose: Deterministic outputs match approved fixtures.
+    inputs: ["evals/golden/**", "out/**"]
+    command: "framework test golden --golden evals/golden --actual out"
+    pass_when:
+      - for deterministic stages (extractors, templates): byte-identical after
+        normalisation (sorted keys, LF line endings, no timestamps)
+      - for LLM stages: not compared here (see G7-eval)
+    fail_when:
+      - any diff not accompanied by an approved golden update
+    golden_update_rule:
+      - update only via `framework golden approve <path> --reason "<text>"`
+      - the reason is written to evals/golden/CHANGELOG.md
+      - a PR changing goldens must reference that entry
+    tolerance: 0 unexplained diffs
+
+  - id: G6-roundtrip
+    make: test-roundtrip
+    introduced_in: T15
+    purpose: extract -> generate -> extract loses nothing.
+    inputs: ["examples/*", "specs/**"]
+    command: "framework test roundtrip --project examples/spring-petclinic"
+    pass_when:
+      - run 1: extract C4->C3->C2 from the example -> specs A
+      - run 2: generate skeleton from A -> re-extract -> specs B
+      - compare A and B on structural fields only (ids, kind, name, parent,
+        realizes, dependencies). Ignore descriptions/summaries (origin=inferred).
+      - structural diff == 0, OR every diff item is listed in
+        evals/known-drift.yaml with an explanation and a backlog reference
+    fail_when:
+      - any structural diff not in known-drift.yaml
+      - known-drift.yaml contains an item that no longer occurs (stale entry)
+    tolerance: 0 unlisted diffs
+
+  - id: G7-eval
+    make: eval
+    introduced_in: T10
+    purpose: LLM skill outputs are correct enough and never invent structure.
+    inputs: ["core/skills/*/golden/**", "evals/cases/**"]
+    command: "framework eval run --skills all --cases evals/cases --runs 3"
+    metrics:
+      schema_valid_rate:        {threshold: 1.00, comparator: ">="}   # every output validates
+      invented_structure_count: {threshold: 0,    comparator: "=="}   # elements without extractor/human backing
+      link_completeness_rate:   {threshold: 1.00, comparator: ">="}
+      inferred_field_labelled:  {threshold: 1.00, comparator: ">="}   # origin=inferred + confidence present
+      name_match_rate:          {threshold: 0.85, comparator: ">="}   # vs golden names, normalised
+      rubric_score_mean:        {threshold: 4.0,  comparator: ">="}   # 1-5, judge model, fixed rubric in evals/rubric.md
+      run_stability:            {threshold: 0.90, comparator: ">="}   # agreement across 3 runs on structural fields
+    pass_when:
+      - all metrics meet thresholds on every skill
+      - adversarial cases pass: injected fake class/dependency is rejected by the validator
+    fail_when:
+      - any metric below threshold
+      - any metric regresses more than 0.05 vs evals/baselines/eval-baseline.json
+    baseline_update: same approval rule as goldens
+    notes:
+      - hard metrics (first four) are deterministic checks; only rubric_score uses an LLM judge
+      - fix model id, temperature=0, and prompt version in the run report
+
+  - id: G8-constitution
+    make: check-constitution
+    introduced_in: T01
+    purpose: Mechanical checks for constitution rules that are cheaply enforceable.
+    command: "framework check constitution"
+    pass_when:
+      - core/ contains no imports of java-profile/ or extensions/
+      - core/ contains no string 'org.springframework' or other profile-specific markers
+      - no edits inside `manual` regions in the diff (checked via region markers)
+      - IDs in changed specs are not removed or altered vs base branch
+      - no gate definition weakened vs base branch (thresholds, tolerance, inputs)
+    fail_when:
+      - any check fails
+    tolerance: 0 violations
+
+order: [G8-constitution, G1-schemas, G2-links, G3-compile, G4-boundaries, G5-golden, G6-roundtrip, G7-eval]
+ci:
+  fail_fast: false          # run all, report all
+  required_for_merge: all   # every gate that is due (introduced_in <= current task)
+  skipped_is_pass: false    # in CI summary skipped gates are shown, not counted as passed
